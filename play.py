@@ -1,20 +1,22 @@
-import pygame, random
+import pygame
+import random
+import cv2
+import mediapipe as mp
 
 
-    
 def update_fps():
-    #*function to display fps counter
-    #settting font for fps counter
+    # *function to display fps counter
+    # settting font for fps counter
     font = pygame.font.SysFont("Arial", 18)
-    #finding fps amount 
+    # finding fps amount
     fps = str(int(clock.get_fps()))
-    #creating fps text
+    # creating fps text
     fps_text = font.render(fps, 1, pygame.Color("coral"))
     return fps_text
 
 
 def p1_handle_event(event):
-    #managing events with computer player
+    # managing events with computer player
     global p1_move_up, p1_move_down
 
     if event.type == pygame.KEYDOWN:
@@ -36,9 +38,8 @@ def p1_update():
     pass
 
 
-
 def human_handle_event(event):
-    #handling events with human player
+    # handling events with human player
     global p2_move_up, p2_move_down
 
     if event.type == pygame.KEYDOWN:
@@ -66,9 +67,8 @@ def random_handle_event(event):
 
 
 def random_update():
-    #computer moves randomly
+    # computer moves randomly
     global p2_move_up, p2_move_down
-
     move = random.randint(1, 2)
 
     if move == 1:  # up
@@ -82,15 +82,13 @@ def random_update():
         p2_move_down = False
 
 
-
-
 def following_handle_event(event):
     # do nothing
     pass
 
 
 def following_update():
-    #computer follows position of ball
+    # computer follows position of ball
     global p2_move_up, p2_move_down
 
     if ball_y < p2_pad_y + 50:
@@ -104,25 +102,24 @@ def following_update():
         p2_move_down = False
 
 
-# --- main ---
+# * --- main ---
 
-### initialize game
+# initialize game
 pygame.init()
 
-### setup display
-DISPLAY_SIZE = DISPLAY_WIDTH, DISPLAY_HEIGHT = 800, 600
+# setup display
+DISPLAY_SIZE = DISPLAY_WIDTH, DISPLAY_HEIGHT = 1000, 720
 screen = pygame.display.set_mode(DISPLAY_SIZE)
 
-### set window caption
+# set window caption
 pygame.display.set_caption("Handtracking Pong by Curtis Li")
 
-### clock
+# clock
 clock = pygame.time.Clock()
 
-### hide cursor
+# hide cursor
 pygame.mouse.set_visible(False)
 
-### game constants
 # buttons
 P1_UP = pygame.K_w
 P1_DOWN = pygame.K_s
@@ -131,36 +128,37 @@ P2_DOWN = pygame.K_DOWN
 
 # other constants
 PLAYER_PAD_LENGTH = 100
-PLAYER_PAD_SPEED = 10
+PLAYER_PAD_SPEED = 7.5
 PLAYER_PAD_WIDTH = 10
 BALL_RADIUS = 6
 
-### game variables
-## player scores
+# player scores
 p1_score = 0
 p2_score = 0
 
-## ball speed is split into x and y axes
+# ball speed is split into x and y axis
 ball_speed_x = 7.5
 ball_speed_y = 7.5
 
-## ball coordinates
+# ball coordinates
 ball_x = 400
 ball_y = 300
 
-## player pad y's
+# player pad y's
 p1_pad_y = 300
 p2_pad_y = 300
 
-## player move flags
+# player move flags
 p1_move_up = False
 p1_move_down = False
 p2_move_up = False
 p2_move_down = False
 
-#computer's playing mode
-p2_type = "random"
-
+# Handtracking position variables
+cy = 0
+cx = 0
+# computer's playing mode
+p2_type = "following"
 
 if p2_type == "random":
     # computer will simulate random movements
@@ -175,129 +173,190 @@ elif p2_type == "human":
     p2_handle_event = human_handle_event
     p2_update = human_update
 
+# Global variables
+mp_drawing = mp.solutions.drawing_utils
+mp_drawing_styles = mp.solutions.drawing_styles
+mp_hands = mp.solutions.hands
+# For webcam input:
+cap = cv2.VideoCapture(0)
+# Set fps
+cap.set(cv2.CAP_PROP_FPS, 30)
+cfps = int(cap.get(cv2.CAP_PROP_FPS))
+# Set resolution
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+# Set max num of hands detected
+# Set the percentage confidence needed to detect a hand (0-1)
+with mp_hands.Hands(model_complexity=0,
+                    max_num_hands=1,
+                    min_detection_confidence=0.5,
+                    min_tracking_confidence=0.5) as hands:
+    # main game loop
+    while True:
+        success, image = cap.read()
+        if not success:
+            print("Ignoring empty camera frame.")
+            # If loading a video, use 'break' instead of 'continue'.
+            continue
 
-### main game loop
-while True:
-    
-    ## detect and process key events
-    # keydowns and keyups raise and lower player paddles
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            exit()
-        # get players keys
-        p1_handle_event(event)
-        p2_handle_event(event)
+        # To improve performance, optionally mark the image as not
+        # writeable to pass by reference.
+        image.flags.writeable = False
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        results = hands.process(image)
+        # *Convert image to pixel measurement
+        image_height, image_width, _ = image.shape
+        # Draw the hand annotations on the image.
+        image.flags.writeable = True
+        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        if results.multi_hand_landmarks:
+            for hand_landmarks in results.multi_hand_landmarks:
+                # Getting x,y coordinates of the hand points
+                for ids, landmrk in enumerate(hand_landmarks.landmark):
+                    # Changing 0-1 value to x,y pixel values
+                    cx, cy = (landmrk.x * image_width, landmrk.y
+                                * image_height)
+                    # id 9 is the bottom of the middle finger
+                    # (closest to palm)
+                    # Uncomment to print x and y coordinates of hand
+                    """if ids == 9:
+                        print(ids, cx, cy)"""
+                # Drawing landmarks on the screen
+                mp_drawing.draw_landmarks(
+                    image, hand_landmarks, mp_hands.HAND_CONNECTIONS,
+                    mp_drawing_styles.get_default_hand_landmarks_style(),
+                    mp_drawing_styles.get_default_hand_connections_style())
+        # Flip the image horizontally for a selfie-view display.
+        cv2.imshow('MediaPipe Hands', cv2.flip(image, 1))
+        if cv2.waitKey(5) & 0xFF == 27:
+            break
+        
+        # keydowns and keyups raise and lower player paddles
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                cap.release()
+                pygame.quit()
+                exit()
+            # get players keys
+            p1_handle_event(event)
+            p2_handle_event(event)
 
-    # get other changes
-    p1_update()
-    p2_update()
+        # get other changes
+        p1_update()
+        p2_update()
 
-    ## move player pads
-    if p1_move_up:
-        p1_pad_y -= PLAYER_PAD_SPEED
-        if p1_pad_y < 0:
-            p1_pad_y = 0
-    elif p1_move_down:
-        p1_pad_y += PLAYER_PAD_SPEED
-        if p1_pad_y > DISPLAY_HEIGHT - PLAYER_PAD_LENGTH:
-            p1_pad_y = DISPLAY_HEIGHT - PLAYER_PAD_LENGTH
-    if p2_move_up:
-        p2_pad_y -= PLAYER_PAD_SPEED
-        if p2_pad_y < 0:
-            p2_pad_y = 0
-    elif p2_move_down:
-        p2_pad_y += PLAYER_PAD_SPEED
-        if p2_pad_y > DISPLAY_HEIGHT - PLAYER_PAD_LENGTH:
-            p2_pad_y = DISPLAY_HEIGHT - PLAYER_PAD_LENGTH
+        # move player pads to hand position
+        if cy < p1_pad_y + 50:
+            p1_move_up = True
+            p1_move_down = False
+        elif cy > p1_pad_y + 50:
+            p1_move_up = False
+            p1_move_down = True
+        else:  # stop
+            p1_move_up = False
+            p1_move_down = False
+        # move player pads
+        if p1_move_up:
+            p1_pad_y -= PLAYER_PAD_SPEED
+            if p1_pad_y < 0:
+                p1_pad_y = 0
+        elif p1_move_down:
+            p1_pad_y += PLAYER_PAD_SPEED
+            if p1_pad_y > DISPLAY_HEIGHT - PLAYER_PAD_LENGTH:
+                p1_pad_y = DISPLAY_HEIGHT - PLAYER_PAD_LENGTH
+        if p2_move_up:
+            p2_pad_y -= PLAYER_PAD_SPEED
+            if p2_pad_y < 0:
+                p2_pad_y = 0
+        elif p2_move_down:
+            p2_pad_y += PLAYER_PAD_SPEED
+            if p2_pad_y > DISPLAY_HEIGHT - PLAYER_PAD_LENGTH:
+                p2_pad_y = DISPLAY_HEIGHT - PLAYER_PAD_LENGTH
 
-    ## move ball
-    ball_x += ball_speed_x
-    ball_y += ball_speed_y
+        # move ball
+        ball_x += ball_speed_x
+        ball_y += ball_speed_y
 
-    ## check ball position
-    # if out screen vertically, flip ball_speed_y
-    if ball_y < 0 or ball_y > DISPLAY_HEIGHT - BALL_RADIUS:
-        ball_speed_y = -ball_speed_y
+        # check ball position
+        # if out screen vertically, flip ball_speed_y
+        if ball_y < 0 or ball_y > DISPLAY_HEIGHT - BALL_RADIUS:
+            ball_speed_y = -ball_speed_y
 
-    # if out screen horizontally, check whether player pad is there or not
-    # if not, release the ball at the center towards scoring player
-    if ball_x < 0:
-        if p1_pad_y < ball_y < p1_pad_y + PLAYER_PAD_LENGTH:
-            ball_speed_x = -ball_speed_x
-        else:
-            p2_score += 1
-            ball_x = 400
-            ball_y = 300
-            ball_speed_x = 7.5
-            ball_speed_y = 7.5
-    elif ball_x > DISPLAY_WIDTH:
-        if p2_pad_y < ball_y < p2_pad_y + PLAYER_PAD_LENGTH:
-            ball_speed_x = -ball_speed_x
-        else:
-            p1_score += 1
-            ball_x = 400
-            ball_y = 300
-            ball_speed_x = -7.5
-            ball_speed_y = -7.5
+        # if out screen horizontally, check whether player pad is there or not
+        # if not, release the ball at the center towards scoring player
+        if ball_x < 0:
+            if p1_pad_y < ball_y < p1_pad_y + PLAYER_PAD_LENGTH:
+                ball_speed_x = -ball_speed_x
+            else:
+                p2_score += 1
+                ball_x = 400
+                ball_y = 300
+                ball_speed_x = 7.5
+                ball_speed_y = 7.5
+        elif ball_x > DISPLAY_WIDTH:
+            if p2_pad_y < ball_y < p2_pad_y + PLAYER_PAD_LENGTH:
+                ball_speed_x = -ball_speed_x
+            else:
+                p1_score += 1
+                ball_x = 400
+                ball_y = 300
+                ball_speed_x = -7.5
+                ball_speed_y = -7.5
 
-    ## clear the screen
-    screen.fill(pygame.Color(0, 0, 0, 255))
+        # clear the screen
+        screen.fill(pygame.Color(0, 0, 0, 255))
 
-    ## draw ball
-    pygame.draw.circle(
-        screen, pygame.Color(255, 255, 255, 255), (ball_x, ball_y), BALL_RADIUS
-    )
+        # draw ball
+        pygame.draw.circle(screen, pygame.Color(255, 255, 255, 255),
+                        (ball_x, ball_y), BALL_RADIUS)
 
-    ## draw P1 pad
-    pygame.draw.rect(
-        screen,
-        pygame.Color(255, 255, 255, 255),
-        (0, p1_pad_y, PLAYER_PAD_WIDTH, PLAYER_PAD_LENGTH),
-    )
+        # draw P1 pad
+        pygame.draw.rect(
+            screen,
+            pygame.Color(255, 255, 255, 255),
+            (0, p1_pad_y, PLAYER_PAD_WIDTH, PLAYER_PAD_LENGTH),
+        )
 
-    ## draw P2 pad
-    pygame.draw.rect(
-        screen,
-        pygame.Color(255, 255, 255, 255),
-        (
-            DISPLAY_WIDTH - PLAYER_PAD_WIDTH,
-            p2_pad_y,
-            PLAYER_PAD_WIDTH,
-            PLAYER_PAD_LENGTH,
-        ),
-    )
+        # draw P2 pad
+        pygame.draw.rect(
+            screen,
+            pygame.Color(255, 255, 255, 255),
+            (
+                DISPLAY_WIDTH - PLAYER_PAD_WIDTH,
+                p2_pad_y,
+                PLAYER_PAD_WIDTH,
+                PLAYER_PAD_LENGTH,
+            ),
+        )
 
-    ## draw center line
-    pygame.draw.rect(
-        screen,
-        pygame.Color(255, 255, 255, 255),
-        (DISPLAY_WIDTH / 2, 0, 1, DISPLAY_HEIGHT),
-    )
+        # draw center line
+        pygame.draw.rect(
+            screen,
+            pygame.Color(255, 255, 255, 255),
+            (DISPLAY_WIDTH / 2, 0, 1, DISPLAY_HEIGHT),
+        )
 
-    ## draw player scores
-    # create font
-    score_font = pygame.font.Font(None, 30)
+        # draw player scores
+        # create font
+        score_font = pygame.font.Font(None, 30)
 
-    # draw p1 score
-    p1_score_text = str(p1_score)
-    p1_score_render = score_font.render(
-        p1_score_text, 1, pygame.Color(255, 255, 255, 255)
-    )
-    screen.blit(p1_score_render, (DISPLAY_WIDTH / 2 - 50, 50))
+        # draw p1 score
+        p1_score_text = str(p1_score)
+        p1_score_render = score_font.render(p1_score_text, 1,
+                                            pygame.Color(255, 255, 255, 255))
+        screen.blit(p1_score_render, (DISPLAY_WIDTH / 2 - 50, 50))
 
-    # draw p2 score
-    p2_score_text = str(p2_score)
-    p2_score_render = score_font.render(
-        p2_score_text, 1, pygame.Color(255, 255, 255, 255)
-    )
-    screen.blit(p2_score_render, (DISPLAY_WIDTH / 2 + 50, 50))
+        # draw p2 score
+        p2_score_text = str(p2_score)
+        p2_score_render = score_font.render(p2_score_text, 1,
+                                            pygame.Color(255, 255, 255, 255))
+        screen.blit(p2_score_render, (DISPLAY_WIDTH / 2 + 50, 50))
 
-    #update fps counter
-    screen.blit(update_fps(), (10, 0))
+        # update fps counter
+        screen.blit(update_fps(), (10, 0))
 
-    ## pygame.display.flip() is called in order to update graphics properly
-    pygame.display.flip()
+        # pygame.display.flip() is called in order to update graphics properly
+        pygame.display.flip()
 
-    ## tick the clock so we have 60 fps game
-    clock.tick(60)
+        # tick the clock so we have 30 fps game
+        clock.tick(30)

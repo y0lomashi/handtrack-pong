@@ -6,7 +6,7 @@ from pygame_menu import themes
 pygame.init()
 
 # setup display
-DISPLAY_SIZE = DISPLAY_WIDTH, DISPLAY_HEIGHT = 800, 600
+DISPLAY_SIZE = DISPLAY_WIDTH, DISPLAY_HEIGHT = 1000, 720
 screen = pygame.display.set_mode(DISPLAY_SIZE)
 
 # set window caption
@@ -35,8 +35,8 @@ def menu():
         mainmenu._open(level)
 
     mainmenu = pygame_menu.Menu("Welcome",
-                                800,
-                                600,
+                                1000,
+                                720,
                                 theme=themes.THEME_SOLARIZED)
     mainmenu.add.text_input("Name: ", default="username", maxchar=20)
     mainmenu.add.button("Play", start_the_game)
@@ -44,8 +44,8 @@ def menu():
     mainmenu.add.button("Quit", pygame_menu.events.EXIT)
 
     level = pygame_menu.Menu("Select a Difficulty",
-                             800,
-                             600,
+                             1000,
+                             720,
                              theme=themes.THEME_BLUE)
     level.add.selector("Difficulty :", [("Hard", 1), ("Easy", 2),
                                         ("Human", 3)],
