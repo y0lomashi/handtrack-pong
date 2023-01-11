@@ -154,11 +154,8 @@ p1_move_down = False
 p2_move_up = False
 p2_move_down = False
 
-# Handtracking position variables
-cy = 0
-cx = 0
 # computer's playing mode
-p2_type = "following"
+p2_type = "human"
 
 if p2_type == "random":
     # computer will simulate random movements
@@ -185,10 +182,13 @@ cfps = int(cap.get(cv2.CAP_PROP_FPS))
 # Set resolution
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+# Handtracking position variables
+left_y = 0
+right_y = 0
 # Set max num of hands detected
 # Set the percentage confidence needed to detect a hand (0-1)
 with mp_hands.Hands(model_complexity=0,
-                    max_num_hands=1,
+                    max_num_hands=2,
                     min_detection_confidence=0.5,
                     min_tracking_confidence=0.5) as hands:
     # main game loop
@@ -210,17 +210,23 @@ with mp_hands.Hands(model_complexity=0,
         image.flags.writeable = True
         image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
         if results.multi_hand_landmarks:
-            for hand_landmarks in results.multi_hand_landmarks:
-                # Getting x,y coordinates of the hand points
-                for ids, landmrk in enumerate(hand_landmarks.landmark):
-                    # Changing 0-1 value to x,y pixel values
-                    cx, cy = (landmrk.x * image_width, landmrk.y
-                                * image_height)
-                    # id 9 is the bottom of the middle finger
-                    # (closest to palm)
-                    # Uncomment to print x and y coordinates of hand
-                    """if ids == 9:
-                        print(ids, cx, cy)"""
+            if len(results.multi_handedness) == 2:
+                for i in range(len(results.multi_handedness)):
+                    if results.multi_handedness[i].classification[0].label == "Right":
+                        # * Hand point is 9
+                        # AKA .landmark[mp_hands.HandLandmark.MIDDLE_FINGER_MCP]
+                        left_hand = results.multi_hand_landmarks[i].landmark[9]
+                    else:
+                        right_hand = results.multi_hand_landmarks[i].landmark[9]
+                # Getting y coordinates of the hand points
+                left_y = left_hand.y * image_height
+                right_y = right_hand.y * image_height
+            else:
+                left_hand = results.multi_hand_landmarks[0].landmark[9]
+                # Getting y coordinates of the hand points
+                left_y = left_hand.y * image_height
+
+            for hand_landmarks in results.multi_hand_landmarks:                    
                 # Drawing landmarks on the screen
                 mp_drawing.draw_landmarks(
                     image, hand_landmarks, mp_hands.HAND_CONNECTIONS,
@@ -230,9 +236,9 @@ with mp_hands.Hands(model_complexity=0,
         cv2.imshow('MediaPipe Hands', cv2.flip(image, 1))
         if cv2.waitKey(5) & 0xFF == 27:
             break
-        
+        # * --- game logic ---
         # keydowns and keyups raise and lower player paddles
-        for event in pygame.event.get():
+        for event in pygame.event.get(): 
             if event.type == pygame.QUIT:
                 cap.release()
                 pygame.quit()
@@ -246,16 +252,16 @@ with mp_hands.Hands(model_complexity=0,
         p2_update()
 
         # move player pads to hand position
-        if cy < p1_pad_y + 50:
+        if left_y < p1_pad_y + 50:
             p1_move_up = True
             p1_move_down = False
-        elif cy > p1_pad_y + 50:
+        elif left_y > p1_pad_y + 50:
             p1_move_up = False
             p1_move_down = True
         else:  # stop
             p1_move_up = False
             p1_move_down = False
-        # move player pads
+        # move player pads to key press
         if p1_move_up:
             p1_pad_y -= PLAYER_PAD_SPEED
             if p1_pad_y < 0:
@@ -264,6 +270,17 @@ with mp_hands.Hands(model_complexity=0,
             p1_pad_y += PLAYER_PAD_SPEED
             if p1_pad_y > DISPLAY_HEIGHT - PLAYER_PAD_LENGTH:
                 p1_pad_y = DISPLAY_HEIGHT - PLAYER_PAD_LENGTH
+        # move player pads to hand position
+        if right_y < p2_pad_y + 50:
+            p2_move_up = True
+            p2_move_down = False
+        elif right_y > p2_pad_y + 50:
+            p2_move_up = False
+            p2_move_down = True
+        else:  # stop
+            p2_move_up = False
+            p2_move_down = False
+        # move player pads to key press
         if p2_move_up:
             p2_pad_y -= PLAYER_PAD_SPEED
             if p2_pad_y < 0:
@@ -308,7 +325,7 @@ with mp_hands.Hands(model_complexity=0,
 
         # draw ball
         pygame.draw.circle(screen, pygame.Color(255, 255, 255, 255),
-                        (ball_x, ball_y), BALL_RADIUS)
+                           (ball_x, ball_y), BALL_RADIUS)
 
         # draw P1 pad
         pygame.draw.rect(

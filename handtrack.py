@@ -17,7 +17,7 @@ def fullTrack():
     This function is used to track the hand and draw the landmarks on the
     screen.
     """
-    global cx, cy
+    global left_hand, right_hand
     # For webcam input:
     cap = cv2.VideoCapture(0)
     # Set size of webcam window
@@ -26,7 +26,7 @@ def fullTrack():
     # Set max num of hands detected
     # Set the percentage confidence needed to detect a hand (0-1)
     with mp_hands.Hands(model_complexity=0,
-                        max_num_hands=1,
+                        max_num_hands=2,
                         min_detection_confidence=0.5,
                         min_tracking_confidence=0.5) as hands:
         while cap.isOpened():
@@ -47,16 +47,23 @@ def fullTrack():
             image.flags.writeable = True
             image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
             if results.multi_hand_landmarks:
-                for hand_landmarks in results.multi_hand_landmarks:
-                    # Getting x,y coordinates of the hand points
-                    for ids, landmrk in enumerate(hand_landmarks.landmark):
-                        # Changing 0-1 value to x,y pixel values
-                        cx, cy = (landmrk.x * image_width, landmrk.y
-                                  * image_height)
-                        # id 9 is the bottom of the middle finger
-                        # (closest to palm)
-                        if ids == 9:
-                            print(ids, cx, cy)
+                if len(results.multi_handedness) == 2:
+                    for i in range(len(results.multi_handedness)):
+                        if results.multi_handedness[i].classification[0].label == "Left":
+                            # * Hand point is 9
+                            # AKA .landmark[mp_hands.HandLandmark.MIDDLE_FINGER_MCP]
+                            left_hand = results.multi_hand_landmarks[i].landmark[9]
+                        else:
+                            right_hand = results.multi_hand_landmarks[i].landmark[9]
+                    # Getting y coordinates of the hand points
+                    left_y = left_hand.y * image_height
+                    right_y = right_hand.y * image_height
+                else:
+                    left_hand = results.multi_hand_landmarks[0].landmark[9]
+                    # Getting y coordinates of the hand points
+                    left_y = left_hand.y * image_height
+                
+                for hand_landmarks in results.multi_hand_landmarks:                    
                     # Drawing landmarks on the screen
                     mp_drawing.draw_landmarks(
                         image, hand_landmarks, mp_hands.HAND_CONNECTIONS,
