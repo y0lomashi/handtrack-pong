@@ -1,6 +1,7 @@
 import pygame
 import pygame_menu
 from pygame_menu import themes
+import settings as s
 
 # initialize game
 pygame.init()
@@ -15,14 +16,14 @@ pygame.display.set_caption("Handtracking Pong by Curtis Li")
 
 # menu function
 def set_difficulty(value, difficulty):
-
-    p2_type = "random"
+    # Default difficulty
+    s.p2_type = "human"
     if difficulty == 0:
-        p2_type = "random"
+        s.p2_type = "random"
     if difficulty == 1:
-        p2_type = "following"
+        s.p2_type = "following"
     if difficulty == 2:
-        p2_type = "human"
+        s.p2_type = "human"
 
 
 def menu():
@@ -47,8 +48,8 @@ def menu():
                              1000,
                              720,
                              theme=themes.THEME_BLUE)
-    level.add.selector("Difficulty :", [("Hard", 1), ("Easy", 2),
-                                        ("Human", 3)],
+    level.add.selector("Difficulty :", [("Easy", 0), ("Human", 2),
+                                        ("Hard", 1)],
                        onchange=set_difficulty)
     while True:
         events = pygame.event.get()

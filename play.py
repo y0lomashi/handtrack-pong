@@ -4,6 +4,8 @@ import cv2
 import mediapipe as mp
 import threading
 
+import settings as s
+
 
 def update_fps():
     # *function to display fps counter
@@ -156,17 +158,15 @@ p2_move_up = False
 p2_move_down = False
 
 # computer's playing mode
-p2_type = "human"
-
-if p2_type == "random":
+if s.p2_type == "random":
     # computer will simulate random movements
     p2_handle_event = random_handle_event
     p2_update = random_update
-elif p2_type == "following":
+elif s.p2_type == "following":
     # computer will follow ball's position
     p2_handle_event = following_handle_event
     p2_update = following_update
-elif p2_type == "human":
+elif s.p2_type == "human":
     # human will click keys
     p2_handle_event = human_handle_event
     p2_update = human_update
@@ -206,7 +206,7 @@ def fullTrack(postition):
                         max_num_hands=2,
                         min_detection_confidence=0.5,
                         min_tracking_confidence=0.5) as hands:
-        while True:
+        while cap.isOpened():
             success, image = cap.read()
             if not success:
                 print("Ignoring empty camera frame.")
@@ -224,24 +224,25 @@ def fullTrack(postition):
             image.flags.writeable = True
             image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
             if results.multi_hand_landmarks:
-                if len(results.multi_handedness) == 2:
-                    for i in range(len(results.multi_handedness)):
-                        if results.multi_handedness[i].classification[
-                                0].label == "Right":
-                            # * Hand point is 9
-                            # AKA .landmark[mp_hands.HandLandmark.MIDDLE_FINGER_MCP]
-                            left_hand = results.multi_hand_landmarks[
-                                i].landmark[9]
-                        else:
-                            right_hand = results.multi_hand_landmarks[
-                                i].landmark[9]
+                if len(results.multi_handedness) > 1:
+                    # * Hand point is 9
+                    # AKA .landmark[mp_hands.HandLandmark.MIDDLE_FINGER_MCP]
+                    hand1 = results.multi_hand_landmarks[
+                        0].landmark[9]
+                    hand2 = results.multi_hand_landmarks[
+                        1].landmark[9]
+
                     # Getting y coordinates of the hand points
-                    postition[0] = left_hand.y * image_height
-                    postition[1] = right_hand.y * image_height
+                    if hand1.x > hand2.x:
+                        postition[0] = hand1.y * image_height
+                        postition[1] = hand2.y * image_height
+                    else:
+                        postition[0] = hand2.y * image_height
+                        position[1] = hand1.y * image_height
                 else:
-                    left_hand = results.multi_hand_landmarks[0].landmark[9]
+                    hand1 = results.multi_hand_landmarks[0].landmark[9]
                     # Getting y coordinates of the hand points
-                    position[0] = left_hand.y * image_height
+                    position[0] = hand1.y * image_height
 
                 for hand_landmarks in results.multi_hand_landmarks:
                     # Drawing landmarks on the screen
@@ -251,8 +252,9 @@ def fullTrack(postition):
                         mp_drawing_styles.get_default_hand_connections_style())
             # Flip the image horizontally for a selfie-view display.
             position[2] = image
+        cap.release()
 
-
+#* Multithreading used to improve performance of the program
 # Start the thread
 thread = threading.Thread(target=fullTrack, args=(position, ))
 thread.start()
@@ -325,7 +327,7 @@ while True:
 
     # if out screen horizontally, check whether player pad is there or not
     # if not, release the ball at the center towards scoring player
-    if ball_x < 0:
+    if ball_x < 10:
         if p1_pad_y < ball_y < p1_pad_y + PLAYER_PAD_LENGTH:
             ball_speed_x = -ball_speed_x
         else:
@@ -334,7 +336,7 @@ while True:
             ball_y = 300
             ball_speed_x = 5
             ball_speed_y = 5
-    elif ball_x > DISPLAY_WIDTH:
+    elif ball_x > DISPLAY_WIDTH-10:
         if p2_pad_y < ball_y < p2_pad_y + PLAYER_PAD_LENGTH:
             ball_speed_x = -ball_speed_x
         else:
