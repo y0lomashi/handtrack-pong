@@ -3,6 +3,8 @@ import random
 import cv2
 import mediapipe as mp
 import threading
+import time
+import sys
 
 import settings as s
 
@@ -243,6 +245,8 @@ def fullTrack(postition):
                     hand1 = results.multi_hand_landmarks[0].landmark[9]
                     # Getting y coordinates of the hand points
                     position[0] = hand1.y * image_height
+                    
+                    p2_update()
 
                 for hand_landmarks in results.multi_hand_landmarks:
                     # Drawing landmarks on the screen
@@ -256,9 +260,11 @@ def fullTrack(postition):
 
 #* Multithreading used to improve performance of the program
 # Start the thread
+event = threading.Event()
 thread = threading.Thread(target=fullTrack, args=(position, ))
 thread.start()
 
+time.sleep(3)#* Sleep for 1 second to allow the thread to start
 # * --- game logic ---
 while True:
     left_y = position[0]
@@ -268,7 +274,7 @@ while True:
         if event.type == pygame.QUIT:
             cap.release()
             pygame.quit()
-            exit()
+            sys.exit()
         # get players keys
         p1_handle_event(event)
         p2_handle_event(event)
@@ -278,16 +284,17 @@ while True:
     p2_update()
 
     # move player pads to hand position
-    if left_y < p1_pad_y - 20:
+    buffer = 4
+    if left_y < p1_pad_y - buffer:
         p1_move_up = True
         p1_move_down = False
-    elif left_y > p1_pad_y + 20:
+    elif left_y > p1_pad_y + buffer:
         p1_move_up = False
         p1_move_down = True
     else:  # stop
         p1_move_up = False
         p1_move_down = False
-    # move player pads to key press
+    # move player pads
     if p1_move_up:
         p1_pad_y -= PLAYER_PAD_SPEED
         if p1_pad_y < 0:
@@ -297,16 +304,17 @@ while True:
         if p1_pad_y > DISPLAY_HEIGHT - PLAYER_PAD_LENGTH:
             p1_pad_y = DISPLAY_HEIGHT - PLAYER_PAD_LENGTH
     # move player pads to hand position
-    if right_y < p2_pad_y - 20:
-        p2_move_up = True
-        p2_move_down = False
-    elif right_y > p2_pad_y + 20:
-        p2_move_up = False
-        p2_move_down = True
-    else:  # stop
-        p2_move_up = False
-        p2_move_down = False
-    # move player pads to key press
+    if s.p2_type == "human":
+        if right_y < p2_pad_y - buffer:
+            p2_move_up = True
+            p2_move_down = False
+        elif right_y > p2_pad_y + buffer:
+            p2_move_up = False
+            p2_move_down = True
+        else:  # stop
+            p2_move_up = False
+            p2_move_down = False
+    # move player pads 
     if p2_move_up:
         p2_pad_y -= PLAYER_PAD_SPEED
         if p2_pad_y < 0:

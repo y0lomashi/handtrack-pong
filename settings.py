@@ -1,4 +1,4 @@
-#global settings shared between files
+# Global settings for the AI_handtrack_pong project
 
-global p2_type
-p2_type = "random"
+# player 2 default type
+p2_type = "following"

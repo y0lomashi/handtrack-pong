@@ -17,7 +17,7 @@ pygame.display.set_caption("Handtracking Pong by Curtis Li")
 # menu function
 def set_difficulty(value, difficulty):
     # Default difficulty
-    s.p2_type = "human"
+    s.p2_type = "following"
     if difficulty == 0:
         s.p2_type = "random"
     if difficulty == 1:
@@ -48,8 +48,8 @@ def menu():
                              1000,
                              720,
                              theme=themes.THEME_BLUE)
-    level.add.selector("Difficulty :", [("Easy", 0), ("Human", 2),
-                                        ("Hard", 1)],
+    level.add.selector("Difficulty :", [("Easy", 0), ("Hard", 1),
+                                        ("Human", 2)],
                        onchange=set_difficulty)
     while True:
         events = pygame.event.get()
