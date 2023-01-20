@@ -3,7 +3,7 @@ import random
 import cv2
 import mediapipe as mp
 import threading
-import time
+import json
 import sys
 
 import settings as s
@@ -113,7 +113,7 @@ def following_update():
 pygame.init()
 
 # setup display
-DISPLAY_SIZE = DISPLAY_WIDTH, DISPLAY_HEIGHT = 1000, 720
+DISPLAY_SIZE = DISPLAY_WIDTH, DISPLAY_HEIGHT = 1000, 650
 screen = pygame.display.set_mode(DISPLAY_SIZE)
 
 # set window caption
@@ -133,20 +133,20 @@ P2_DOWN = pygame.K_DOWN
 
 # other constants
 PLAYER_PAD_LENGTH = 100
-PLAYER_PAD_SPEED = 7.5
+PLAYER_PAD_SPEED = 5
 PLAYER_PAD_WIDTH = 10
 BALL_RADIUS = 6
 
 # player scores
-p1_score = 0
-p2_score = 0
+s.p1_score = 0
+s.p2_score = 0
 
 # ball speed is split into x and y axis
 ball_speed_x = 7.5
 ball_speed_y = 7.5
 
 # ball coordinates
-ball_x = 400
+ball_x = 50
 ball_y = 300
 
 # player pad y's
@@ -191,6 +191,8 @@ left_y = 0
 right_y = 0
 position = [0, 0, 0]
 
+running = True
+
 
 def fullTrack(postition):
     """
@@ -208,7 +210,7 @@ def fullTrack(postition):
                         max_num_hands=2,
                         min_detection_confidence=0.5,
                         min_tracking_confidence=0.5) as hands:
-        while cap.isOpened():
+        while running:
             success, image = cap.read()
             if not success:
                 print("Ignoring empty camera frame.")
@@ -229,10 +231,8 @@ def fullTrack(postition):
                 if len(results.multi_handedness) > 1:
                     # * Hand point is 9
                     # AKA .landmark[mp_hands.HandLandmark.MIDDLE_FINGER_MCP]
-                    hand1 = results.multi_hand_landmarks[
-                        0].landmark[9]
-                    hand2 = results.multi_hand_landmarks[
-                        1].landmark[9]
+                    hand1 = results.multi_hand_landmarks[0].landmark[9]
+                    hand2 = results.multi_hand_landmarks[1].landmark[9]
 
                     # Getting y coordinates of the hand points
                     if hand1.x > hand2.x:
@@ -245,7 +245,7 @@ def fullTrack(postition):
                     hand1 = results.multi_hand_landmarks[0].landmark[9]
                     # Getting y coordinates of the hand points
                     position[0] = hand1.y * image_height
-                    
+
                     p2_update()
 
                 for hand_landmarks in results.multi_hand_landmarks:
@@ -256,24 +256,36 @@ def fullTrack(postition):
                         mp_drawing_styles.get_default_hand_connections_style())
             # Flip the image horizontally for a selfie-view display.
             position[2] = image
-        cap.release()
+            if not running:
+                cap.release()
+                sys.exit(0)
 
-#* Multithreading used to improve performance of the program
+
+# * Multithreading used to improve performance of the program
 # Start the thread
 event = threading.Event()
 thread = threading.Thread(target=fullTrack, args=(position, ))
 thread.start()
 
-time.sleep(3)#* Sleep for 1 second to allow the thread to start
+try:
+    with open(s.filepath, 'r') as f:
+        scores = json.load(f)
+except FileNotFoundError:
+    scores = {}
+
 # * --- game logic ---
-while True:
+while running:
     left_y = position[0]
     right_y = position[1]
     # keydowns and keyups raise and lower player paddles
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            cap.release()
+            scores[s.username] = s.p1_score
+            with open(s.filepath, 'w+') as f:
+                json.dump(scores, f)
+            # quit game
             pygame.quit()
+            running = False
             sys.exit()
         # get players keys
         p1_handle_event(event)
@@ -314,7 +326,7 @@ while True:
         else:  # stop
             p2_move_up = False
             p2_move_down = False
-    # move player pads 
+    # move player pads
     if p2_move_up:
         p2_pad_y -= PLAYER_PAD_SPEED
         if p2_pad_y < 0:
@@ -339,17 +351,17 @@ while True:
         if p1_pad_y < ball_y < p1_pad_y + PLAYER_PAD_LENGTH:
             ball_speed_x = -ball_speed_x
         else:
-            p2_score += 1
-            ball_x = 400
+            s.p2_score += 1
+            ball_x = 50
             ball_y = 300
             ball_speed_x = 5
             ball_speed_y = 5
-    elif ball_x > DISPLAY_WIDTH-10:
+    elif ball_x > DISPLAY_WIDTH - 10:
         if p2_pad_y < ball_y < p2_pad_y + PLAYER_PAD_LENGTH:
             ball_speed_x = -ball_speed_x
         else:
-            p1_score += 1
-            ball_x = 400
+            s.p1_score += 1
+            ball_x = 750
             ball_y = 300
             ball_speed_x = -5
             ball_speed_y = -5
@@ -392,16 +404,16 @@ while True:
     score_font = pygame.font.Font(None, 30)
 
     # draw p1 score
-    p1_score_text = str(p1_score)
-    p1_score_render = score_font.render(p1_score_text, 1,
-                                        pygame.Color(255, 255, 255, 255))
-    screen.blit(p1_score_render, (DISPLAY_WIDTH / 2 - 50, 50))
+    s.p1_score_text = str(s.p1_score)
+    s.p1_score_render = score_font.render(s.p1_score_text, 1,
+                                          pygame.Color(255, 255, 255, 255))
+    screen.blit(s.p1_score_render, (DISPLAY_WIDTH / 2 - 50, 50))
 
     # draw p2 score
-    p2_score_text = str(p2_score)
-    p2_score_render = score_font.render(p2_score_text, 1,
-                                        pygame.Color(255, 255, 255, 255))
-    screen.blit(p2_score_render, (DISPLAY_WIDTH / 2 + 50, 50))
+    s.p2_score_text = str(s.p2_score)
+    s.p2_score_render = score_font.render(s.p2_score_text, 1,
+                                          pygame.Color(255, 255, 255, 255))
+    screen.blit(s.p2_score_render, (DISPLAY_WIDTH / 2 + 50, 50))
 
     # update fps counter
     screen.blit(update_fps(), (10, 0))
