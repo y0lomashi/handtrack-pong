@@ -4,6 +4,10 @@ Handtrack Pong is a pong game that can be played with hand gestures detected by 
 <br />
 Made in Python.
 
+## Demo
+
+![](https://github.com/y0lomashi/handtrack-pong/blob/main/Handtrack%20Ping%20Demo.gif)
+
 ## Installation
 
 Required libraries include Mediapipe, Opencv, pygame, pygame_menu.
